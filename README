@@ -1,0 +1,28 @@
+ffnodestats
+
+Idea and stuffs:
+
+database storing connection snapshots, consisting of:
+UnixTimestamp RouterMAC(ID) ClientMAC
+
+possible requests to database:
+
+>routers(from,to) -> unique router MACs
+>clients(from,to) -> unique client MACs
+
+>router_clients(from, to) -> macs of unique connected clients to router in that time span
+
+for a router graph time/clients just do multiple router_clients(from,to) requests for different spans
+and visualize the length of the client array
+
+client_connections(from, to) -> return an array of connections in form of {routerMAC, fromStamp, toStamp}
+this works by assuming that if a client is missing in a snapshot or changed routers, the connection was lost
+
+for a timeline of the client:
+use client_connections(from,to)
+visualize ;)
+
+for a timeline of router where you see when which client connected:
+use router_clients for a span
+for each client use client_connections for that span and filter for connections to that router
+visualize
