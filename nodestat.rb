@@ -41,7 +41,7 @@ class NodeStat
 
   #all known routers in that timespan
   def routers
-    @cons.map{|c| c[:router]}.uniq.map{|m| @list[m].label}
+    @cons.map{|c| c[:router]}.uniq.map{|m| n=@list[m]; n.nil? ? m : n.label}
   end
 
   #all known clients in that timespan
@@ -63,7 +63,6 @@ class NodeStat
   #get all connections of a client in that timespan
   #if router name or mac given, only return connections to that router
   def client_connections(client, router=nil)
-    #TODO: fix last entry connection
     cs = @cons.select{|c| c[:client]==client}.sort_by{|c| c[:time]}
     cons = []
 
