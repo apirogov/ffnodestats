@@ -5,7 +5,7 @@
 
 require './nodequery.rb'
 
-#patches in helpers for dates
+#monkey patches helpers for times
 class Time
 def self.today
   t=Time.now
@@ -34,10 +34,9 @@ class NodeStat
   @@default_start = Time.today
   @@default_length = 24 #hours
 
-  #takes optional :db and :json parameters to be passed to NodeQuery
-  def initialize(h={})
-    @db = h[:db]
-    @json = h[:json]
+  #takes optional db parameter to be passed to NodeQuery
+  def initialize(dbfile=nil)
+    @db = dbfile
   end
 
   #Return all client connections to routers in given time (or for current day if no times given)
@@ -63,38 +62,47 @@ class NodeStat
   #list of clients and how long in total (seconds) each was connected to a FF router for given time
   def client_activity(start=nil, length=nil)
     q = query(start,length)
-    clients = q.clients
-    clients.map do |c|
+    q.clients.map do |c|
       [c, q.client_connections(c).map{|c| c[:end]-c[:start]}.inject(&:+)]
     end
   end
 
   #list of routers and how many unique visitors they had in the given time
+  #TODO: speed up (takes half a minute per router per 25h :/)
   def unique_visitors(start=nil, length=nil)
     q = query(start,length)
-    routers = q.routers
-    routers.map{|r| [r, q.router_clients(r).length]}
+    q.routers.map{|r| [r, q.router_clients(r).length]}
   end
 
-  #TODO: test after reimplementing backend with sqlite
+  #list of routers and how many connections on average they had in the given time
+  #TODO: speed up (takes a minute per router per 24h :/)
   def average_visitors(start=nil, length=nil)
     q = query(start,length)
-    routers = q.routers
-    routers.map do |r|
-      loads = router_client_load r
-      avg = loads.map{|l| l[1]}.inject(&:+).to_f/loads.length
+    q.routers.map do |r|
+      avg = router_load_average(r,start,length)
       [r, avg]
     end
   end
 
-  #---- splits time into discrete slices ----
+  #returns average router load without splitting time up -> a little bit faster
+  def router_load_average(router, start=nil, length=nil)
+    length=@@default_length if length.nil?
+    q = query(start,length)
+    clients = q.router_clients(router)
+    connections = clients.map{|c| q.client_connections(c, router)}.inject(&:+)
+    lengths = connections.map{|c| c[:end]-c[:start]}
+    totallength = lengths.inject(&:+).to_f
+    return totallength/(length.to_f*Time.hour_secs)
+  end
 
-  #returns an array of [Time,client_count] pairs
+  #splits time into discrete slices, does multiple requests
+  #returns an array of [Time,number of clients on this router] pairs
   #router -> router name or mac
   #start -> start time
   #length -> length of timespan in hours
   #step -> X scale in minutes (default: 30)
-  def router_client_load(router,step=30,start=nil,length=nil)
+  def router_load(router,start=nil,length=nil,step=nil)
+    step=30 if step.nil?
     start=@@default_start if start.nil?
     length=@@default_length if length.nil?
     step = step.to_f/60.to_f #to hours
@@ -118,6 +126,6 @@ class NodeStat
     length=@@default_length if length.nil?
     endtime = start+length*Time.hour_secs
 
-    return NodeQuery.new(fr: start, to: endtime, db: @db, json: @json)
+    return NodeQuery.new(fr: start, to: endtime, db: @db)
   end
 end

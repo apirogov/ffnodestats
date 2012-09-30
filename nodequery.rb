@@ -1,25 +1,20 @@
 #!/usr/bin/env ruby
 #NodeQuery - represents a slice of connection information in a given time span
-#needs a textfile database of connections and a nodes.json
-#to resolve multiple MACs to one node
 #Copyright (C) 2012 Anton Pirogov
-
-#TODO: maybe port mac<->names to some sqlite table and write from the updater?
+#Licensed under the GPLv3
 
 require 'date'
 require 'sqlite3'
 
-require 'ffmaplib'
-
 class NodeQuery
 
   attr_reader :cons
-  attr_reader :list
+  attr_reader :macs
 
   #initialize a NodeStat object to make requests
   #which includes all entries for a given time span
   #hash parameters: :fr=start Time (default: unixtime 0) :to=end Time (default: right now)
-  #:db = path to data files (default= ./db) :json=path or URI to nodes.json (default: burgtor.ffhl/mesh/nodes.json)
+  #:db = path to data files (default= ./db)
   def initialize(hash={})
     hash[:fr] = Time.at(0) if hash[:fr].nil?
     hash[:to] = Time.now if hash[:to].nil?
@@ -28,23 +23,18 @@ class NodeQuery
     fr = hash[:fr].to_i
     to = hash[:to].to_i
     db = hash[:db]
-    json = hash[:json]
 
     #load rows requested
     db = SQLite3::Database.new(db)
-    @cons = db.execute "select * FROM connections WHERE time BETWEEN #{fr} AND #{to}"
+    @macs = db.execute("SELECT * FROM routers").map{|e| {router: e[0], macs: e[1].split(' ')}}
+    @cons = db.execute "SELECT * FROM connections WHERE time BETWEEN #{fr} AND #{to}"
     @cons.map!{|a| {time: Time.at(a[0]), router: a[1], client: a[2]}}
     db.close
-
-    #load node json file to resolve macs
-    json = ENV['NODEJSON_PATH'] if json.nil?
-    json = DEFAULT_NODESRC if json.nil?
-    @list = NodeWrapper.new json
   end
 
   #all known routers in that timespan
   def routers
-    @cons.map{|c| c[:router]}.uniq.map{|m| n=@list[m]; n.nil? ? m : n.label}
+    @cons.map{|c| c[:router]}.uniq.map{|m| try_resolve m}
   end
 
   #all known clients in that timespan
@@ -89,11 +79,12 @@ class NodeQuery
 
  # private
 
-  #try to resolve that router mac to a specific router known in nodes.json
+  #try to resolve that router mac to a specific known router name
   #if not possible, return back that mac
   def try_resolve(router)
-    return @list[router].label if @list[router]
-    router
+    ret = @macs.find{|e| e[:router]==router || e[:macs].index(router)}
+    return ret[:router] if ret #found something?
+    router  #nope
   end
 
 end

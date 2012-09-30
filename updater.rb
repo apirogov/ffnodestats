@@ -7,7 +7,8 @@ require 'sqlite3'
 require 'ffmaplib'
 
 dbp = ENV['DBPATH']
-jsonpath = DEFAULT_NODESRC
+jsonpath = ENV['JSONPATH']
+jsonpath = DEFAULT_NODESRC if jsonpath.nil?
 
 if dbp.to_s.empty?
   puts "Please set DBPATH env var!"
@@ -18,6 +19,7 @@ end
 if !File.exists?(dbp)
   SQLite3::Database.new(dbp) do |db|
     db.execute "CREATE TABLE connections (time INTEGER, router VARCHAR(17), client VARCHAR(17));"
+    db.execute "CREATE TABLE routers (router VARCHAR(255), macs VARCHAR(255));"
   end
 end
 
@@ -30,8 +32,19 @@ list.online.routers.to_a.each do |r|
   r.clients.ids.each{|c| connections << "#{timestamp} #{r.id} #{c}"}
 end
 
-#write new connections in 500 row blocks to database
+routers = list.routers.to_a.map{|r| {router: r.label, macs: r.macs.join(' ')}}
+
 db = SQLite3::Database.new(dbp)
+
+#overwrite router->mac list
+#NOTE: as long as there are less than 500 routers it can be written in one command
+db.execute "DELETE FROM routers"
+cmd = "INSERT INTO routers (router, macs) VALUES "
+routers.each{|r| cmd += "(\"#{r[:router]}\", \"#{r[:macs]}\"),"}
+cmd[-1] = ';'
+db.execute cmd
+
+#write new connections in 500 row blocks to database
 
 #template for insert
 cmd = "INSERT INTO connections (time, router, client) VALUES "
