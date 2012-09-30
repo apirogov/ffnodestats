@@ -2,7 +2,6 @@
 #NodeStat is the upper layer to request statistics
 #Copyright (C) 2012 Anton Pirogov
 #Licensed under the GPLv3
-#TODO: change backend to sqlite
 
 require './nodequery.rb'
 

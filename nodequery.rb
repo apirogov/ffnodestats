@@ -4,7 +4,11 @@
 #to resolve multiple MACs to one node
 #Copyright (C) 2012 Anton Pirogov
 
+#TODO: maybe port mac<->names to some sqlite table and write from the updater?
+
 require 'date'
+require 'sqlite3'
+
 require 'ffmaplib'
 
 class NodeQuery
@@ -19,25 +23,22 @@ class NodeQuery
   def initialize(hash={})
     hash[:fr] = Time.at(0) if hash[:fr].nil?
     hash[:to] = Time.now if hash[:to].nil?
-    hash[:db] = File.expand_path('./db') if hash[:db].nil?
+    hash[:db] = './ffnodestats.db' if hash[:db].nil?
 
-    fr = hash[:fr]
-    to = hash[:to]
+    fr = hash[:fr].to_i
+    to = hash[:to].to_i
     db = hash[:db]
     json = hash[:json]
 
-    frd = Time.new(fr.year,fr.month,fr.day,0,0).to_i
-    tod = Time.new(to.year,to.month,to.day,0,0).to_i
+    #load rows requested
+    db = SQLite3::Database.new(db)
+    @cons = db.execute "select * FROM connections WHERE time BETWEEN #{fr} AND #{to}"
+    @cons.map!{|a| {time: Time.at(a[0]), router: a[1], client: a[2]}}
+    db.close
 
-    #get all entries of days touched in span
-    files = (Dir.entries(db)-['.','..']).map(&:to_i).select{|t| t>=frd && t<=tod}.map(&:to_s)
-
-    #convert to hashs and do fine filtering
-    @cons = files.map{|f| loadfile db+'/'+f}.inject(&:+).to_a.select{|c| c[:time]>=fr && c[:time]<=to}
-
+    #load node json file to resolve macs
     json = ENV['NODEJSON_PATH'] if json.nil?
     json = DEFAULT_NODESRC if json.nil?
-
     @list = NodeWrapper.new json
   end
 
@@ -87,13 +88,6 @@ class NodeQuery
   end
 
  # private
-
-  #filepath -> array of connection entry hashs
-  def loadfile(file)
-    File.readlines(file).map{|l| l.split(/\s+/)}.map do |l|
-      {time: Time.at(l[0].to_i), router: l[1], client: l[2]}
-    end
-  end
 
   #try to resolve that router mac to a specific router known in nodes.json
   #if not possible, return back that mac
