@@ -24,8 +24,18 @@ if !File.exists?(dbp)
 end
 
 #read data from json and generate connection rows
-timestamp = Time.now.to_i
-list = NodeWrapper.new jsonpath
+tries = 0
+list = nil
+timestamp = nil
+begin
+  tries += 1
+  timestamp = Time.now.to_i
+  list = NodeWrapper.new jsonpath
+rescue
+  sleep 10
+  retry if tries<5
+  exit 1
+end
 
 connections = []
 list.online.routers.to_a.each do |r|
