@@ -28,7 +28,8 @@ class NodeQuery
     db = SQLite3::Database.new(db)
     @macs = db.execute("SELECT * FROM routers").map{|e| {router: e[0], macs: e[1].split(' ')}}
     @cons = db.execute "SELECT * FROM connections WHERE time BETWEEN #{fr} AND #{to}"
-    @cons.map!{|a| {time: Time.at(a[0]), router: a[1], client: a[2]}}
+    #@cons.map!{|a| {time: Time.at(a[0]), router: a[1], client: a[2]}}  #for debugging with irb
+    @cons.map!{|a| {time: a[0], router: a[1], client: a[2]}}
     db.close
   end
 

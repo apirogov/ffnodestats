@@ -39,12 +39,22 @@ class NodeStat
     @db = dbfile
   end
 
+  #array of known routers
+  def routers(start=nil, length=nil)
+    query(start, length).routers.sort
+  end
+
+  #array of known clients
+  def clients(start=nil, length=nil)
+    query(start, length).clients.sort
+  end
+
   #Return all client connections to routers in given time (or for current day if no times given)
   #client = client mac
   #start = Time
   #length = hours
   def client_timeline(client, start=nil, length=nil)
-    query(start, length).client_connections client
+    query(start, length).client_connections(client).group_by{|c| c[:router]}
   end
 
   #Return all client connections to this router in given time (or for current day if no times given)
@@ -53,10 +63,8 @@ class NodeStat
   #start = Time
   #length = hours
   def router_timeline(router, start=nil, length=nil)
-    q = query(start, length)
-
-    clients = q.router_clients(router)
-    clients.map{|c| q.client_connections c, router}.inject(&:+).to_a.sort_by{|c| c[:start]}
+    q=query(start, length)
+    q.router_clients(router).map{|c| q.client_connections c, router}
   end
 
   #list of clients and how long in total (seconds) each was connected to a FF router for given time
@@ -102,6 +110,7 @@ class NodeStat
   #length -> length of timespan in hours
   #step -> X scale in minutes (default: 30)
   def router_load(router,start=nil,length=nil,step=nil)
+    puts router,start,length,step
     step=30 if step.nil?
     start=@@default_start if start.nil?
     length=@@default_length if length.nil?

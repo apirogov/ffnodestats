@@ -8,6 +8,7 @@ require 'ffmaplib'
 
 dbp = ENV['DBPATH']
 jsonpath = ENV['JSONPATH']
+jsonpath = 'http://holstentor.ffhl/nodes/nodes.json'
 jsonpath = DEFAULT_NODESRC if jsonpath.nil?
 
 if dbp.to_s.empty?
